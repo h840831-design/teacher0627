@@ -1,0 +1,364 @@
+import React, { useState, useEffect } from 'react';
+import { Calendar, MapPin, Clock, Users, Building2, CheckCircle2, AlertCircle } from 'lucide-react';
+
+export default function App() {
+  const [category, setCategory] = useState('chimei'); // 'chimei' or 'other'
+  const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false); // 新增：送出中的狀態
+  
+  // 模擬名額數據 (實際應用中應從後端撈取)
+  const [spots, setSpots] = useState({
+    chimei: 70, // 奇美體系剩餘名額
+    other: 30   // 他院機構剩餘名額
+  });
+
+  const [formData, setFormData] = useState({
+    campus: '奇美醫院',
+    employeeId: '',
+    hospitalName: '',
+    name: '',
+    idNumber: '',
+    email: '',
+    joinCertification: '否'
+  });
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    
+    // 檢查名額
+    if (spots[category] <= 0) {
+      alert('非常抱歉，該組別名額已滿！');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    // ==========================================
+    // 💡 請將下方的 URL 替換為您的 Google Apps Script 部署網址
+    // ==========================================
+    const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxMntwUgQfpqRjSzT7PhZF8NZXwxL2W_Q188qzIFA1bByp5iqnIyrtNKwd8P6k2p-5X/exec';
+
+    try {
+      // 將資料轉換為 URLSearchParams 格式，這是串接 Google Apps Script 最穩定的方式
+      const params = new URLSearchParams();
+      params.append('category', category);
+      Object.keys(formData).forEach(key => {
+        params.append(key, formData[key]);
+      });
+
+      // 將資料送到 Google 試算表
+      await fetch(GOOGLE_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors', // 解決 CORS 跨網域問題
+        body: params,
+      });
+
+      // 扣除名額
+      setSpots(prev => ({
+        ...prev,
+        [category]: prev[category] - 1
+      }));
+      
+      setSubmitted(true);
+    } catch (error) {
+      console.error('報名送出失敗:', error);
+      alert('網路發生錯誤，請稍後再試！');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const resetForm = () => {
+    setSubmitted(false);
+    setFormData({
+      campus: '奇美醫院',
+      employeeId: '',
+      hospitalName: '',
+      name: '',
+      idNumber: '',
+      email: '',
+      joinCertification: '否'
+    });
+  };
+
+  // 判斷是否已截止 (設定為 115年6月15日)
+  // 這裡使用 2026年 代表民國115年進行邏輯判斷
+  const isPastDeadline = new Date() > new Date('2026-06-15T23:59:59');
+
+  return (
+    <div className="min-h-screen bg-slate-50 py-8 px-4 sm:px-6 lg:px-8 font-sans">
+      <div className="max-w-3xl mx-auto">
+        
+        {/* Header Section */}
+        <div className="bg-white rounded-t-2xl shadow-sm border-b-4 border-blue-600 p-6 sm:p-8">
+          <div className="flex items-center justify-center w-16 h-16 bg-blue-100 text-blue-600 rounded-full mb-6 mx-auto">
+            <Building2 size={32} />
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-center text-slate-800 mb-2">
+            115年醫事放射師CBME暨教學評估研討會
+          </h1>
+          <p className="text-center text-slate-500 mb-8 font-medium">報名系統</p>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-slate-600 bg-slate-50 p-4 rounded-xl">
+            <div className="flex items-center gap-2">
+              <Calendar className="text-blue-500 w-5 h-5" />
+              <span>115年6月27日 (星期六)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Clock className="text-blue-500 w-5 h-5" />
+              <span>13:00 - 17:00</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <MapPin className="text-blue-500 w-5 h-5" />
+              <span>第五醫療大樓6樓561會議室</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <AlertCircle className="text-red-500 w-5 h-5" />
+              <span className="text-red-600 font-semibold">報名截止：6月15日</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Form Section */}
+        <div className="bg-white shadow-sm rounded-b-2xl p-6 sm:p-8 mt-1">
+          {submitted ? (
+            <div className="text-center py-12">
+              <CheckCircle2 className="w-20 h-20 text-green-500 mx-auto mb-6" />
+              <h2 className="text-2xl font-bold text-slate-800 mb-2">報名成功！</h2>
+              <p className="text-slate-600 mb-8">
+                感謝您的報名，相關研討會資訊將寄送至您的電子信箱。<br/>
+                請留意您的信件（包含垃圾信件匣）。
+              </p>
+              <button 
+                onClick={resetForm}
+                className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg transition duration-200"
+              >
+                返回填寫新表單
+              </button>
+            </div>
+          ) : (
+            <>
+              {isPastDeadline ? (
+                <div className="text-center py-12 bg-red-50 rounded-xl border border-red-100">
+                  <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+                  <h2 className="text-xl font-bold text-red-700 mb-2">報名已截止</h2>
+                  <p className="text-red-600">本研討會已於 6月15日 截止報名，感謝您的關注。</p>
+                </div>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  
+                  {/* Category Toggle */}
+                  <div className="flex flex-col sm:flex-row gap-4 mb-8">
+                    <label 
+                      className={`flex-1 flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                        category === 'chimei' 
+                          ? 'border-blue-600 bg-blue-50' 
+                          : 'border-slate-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="radio" 
+                          name="category" 
+                          value="chimei" 
+                          checked={category === 'chimei'} 
+                          onChange={() => setCategory('chimei')}
+                          className="w-5 h-5 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className={`font-bold ${category === 'chimei' ? 'text-blue-800' : 'text-slate-700'}`}>
+                          奇美體系
+                        </span>
+                      </div>
+                      <span className={`text-sm px-3 py-1 rounded-full ${
+                        spots.chimei > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}>
+                        剩餘 {spots.chimei} 名
+                      </span>
+                    </label>
+
+                    <label 
+                      className={`flex-1 flex items-center justify-between p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                        category === 'other' 
+                          ? 'border-blue-600 bg-blue-50' 
+                          : 'border-slate-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <input 
+                          type="radio" 
+                          name="category" 
+                          value="other" 
+                          checked={category === 'other'} 
+                          onChange={() => setCategory('other')}
+                          className="w-5 h-5 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className={`font-bold ${category === 'other' ? 'text-blue-800' : 'text-slate-700'}`}>
+                          他院醫療機構
+                        </span>
+                      </div>
+                      <span className={`text-sm px-3 py-1 rounded-full ${
+                        spots.other > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                      }`}>
+                        剩餘 {spots.other} 名
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    
+                    {/* Conditional Fields based on Category */}
+                    {category === 'chimei' ? (
+                      <>
+                        <div className="col-span-1">
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">院區 <span className="text-red-500">*</span></label>
+                          <select 
+                            name="campus" 
+                            value={formData.campus} 
+                            onChange={handleInputChange}
+                            required
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                          >
+                            <option value="奇美醫院">奇美醫院</option>
+                            <option value="柳營奇美醫院">柳營奇美醫院</option>
+                            <option value="佳里奇美醫院">佳里奇美醫院</option>
+                          </select>
+                        </div>
+                        <div className="col-span-1">
+                          <label className="block text-sm font-semibold text-slate-700 mb-2">人事號 <span className="text-red-500">*</span></label>
+                          <input 
+                            type="text" 
+                            name="employeeId" 
+                            value={formData.employeeId} 
+                            onChange={handleInputChange}
+                            placeholder="請輸入人事號碼"
+                            required
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="col-span-1 sm:col-span-2">
+                        <label className="block text-sm font-semibold text-slate-700 mb-2">醫院名稱 <span className="text-red-500">*</span></label>
+                        <input 
+                          type="text" 
+                          name="hospitalName" 
+                          value={formData.hospitalName} 
+                          onChange={handleInputChange}
+                          placeholder="請輸入您所屬的醫院名稱"
+                          required
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                        />
+                      </div>
+                    )}
+
+                    {/* Common Fields */}
+                    <div className="col-span-1">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">姓名 <span className="text-red-500">*</span></label>
+                      <input 
+                        type="text" 
+                        name="name" 
+                        value={formData.name} 
+                        onChange={handleInputChange}
+                        placeholder="請輸入真實姓名"
+                        required
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                      />
+                    </div>
+                    
+                    <div className="col-span-1">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">身分證字號 <span className="text-red-500">*</span></label>
+                      <input 
+                        type="text" 
+                        name="idNumber" 
+                        value={formData.idNumber} 
+                        onChange={handleInputChange}
+                        placeholder="A123456789"
+                        pattern="^[A-Za-z][1-2]\d{8}$"
+                        title="請輸入有效的身分證字號"
+                        required
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                      />
+                    </div>
+
+                    <div className="col-span-1 sm:col-span-2">
+                      <label className="block text-sm font-semibold text-slate-700 mb-2">電子郵件 (E-mail) <span className="text-red-500">*</span></label>
+                      <input 
+                        type="email" 
+                        name="email" 
+                        value={formData.email} 
+                        onChange={handleInputChange}
+                        placeholder="example@email.com"
+                        required
+                        className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                      />
+                    </div>
+
+                    {category === 'chimei' && (
+                      <div className="col-span-1 sm:col-span-2 bg-blue-50 p-4 rounded-xl border border-blue-100">
+                        <label className="block text-sm font-semibold text-slate-800 mb-3">
+                          是否參加新進考官認證測驗？ (17:00~17:30) <span className="text-red-500">*</span>
+                        </label>
+                        <div className="flex gap-6">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                              type="radio" 
+                              name="joinCertification" 
+                              value="是"
+                              checked={formData.joinCertification === '是'}
+                              onChange={handleInputChange}
+                              className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-slate-700">是，我要參加</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                              type="radio" 
+                              name="joinCertification" 
+                              value="否"
+                              checked={formData.joinCertification === '否'}
+                              onChange={handleInputChange}
+                              className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-slate-700">否，不參加</span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-6">
+                    <button 
+                      type="submit"
+                      disabled={spots[category] <= 0 || isSubmitting}
+                      className={`w-full py-3 px-4 rounded-xl text-white font-bold text-lg transition duration-200 shadow-md ${
+                        (spots[category] > 0 && !isSubmitting)
+                          ? 'bg-blue-600 hover:bg-blue-700 hover:shadow-lg' 
+                          : 'bg-slate-400 cursor-not-allowed'
+                      }`}
+                    >
+                      {isSubmitting ? '資料傳送中...' : (spots[category] > 0 ? '確認送出報名' : '該組別名額已滿')}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </>
+          )}
+        </div>
+        
+        {/* Footer */}
+        <p className="text-center text-slate-400 text-sm mt-6">
+          主辦單位：台灣醫事聯合臨床技能發展學會、奇美醫療財團法人奇美醫院<br/>
+          如有問題請聯絡相關組長
+        </p>
+      </div>
+    </div>
+  );
+}
